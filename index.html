@@ -67,6 +67,7 @@ td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:top}
 <button role="tab" id="t4" aria-selected="false" onclick="tab(4)">Officers and public view</button>
 <button role="tab" id="t5" aria-selected="false" onclick="tab(5)">Simple guide</button>
 <button role="tab" id="t6" aria-selected="false" onclick="tab(6)">Workflow</button>
+<button role="tab" id="t7" aria-selected="false" onclick="tab(7)">Search in SIR (OCR)</button>
 </div>
 
 <div id="p0">
@@ -219,6 +220,25 @@ td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:top}
 <h2>Hosting and deployment</h2>
 <p class="note">This page is static: no server, no database. A commit to the repository's main branch can auto-deploy it, so the public always sees the latest version. See <code>.github/workflows/deploy-pages.yml</code> for a ready-made GitHub Pages workflow.</p>
 </section>
+<section>
+<h2>A backend for realtime updates</h2>
+<p class="note">The <code>backend/</code> folder has a small Node server that simulates what integrating a real election database would look like: a REST API plus a WebSocket feed that pushes elector, deletion and activity updates live, instead of this page's in-memory demo data. Run <code>npm start</code> inside <code>backend/</code> and open its monitor page to see it.</p>
+</section>
+</div>
+
+<div id="p7" hidden>
+<section>
+<h2>Search a scanned SIR roll PDF</h2>
+<p class="note">Many published SIR rolls are scanned images, so normal PDF text search does not find a name in them. This runs OCR (optical character recognition) in your browser: the file is read on your device and is never uploaded anywhere. The first use needs an internet connection, to load the OCR library. Official ECI tool for comparison: <a href="https://voters.eci.gov.in/searchinsir/s2ua4dpdf-jk4qwodse" target="_blank" rel="noopener">voters.eci.gov.in</a>.</p>
+<label for="ocrfile">Choose a PDF or image of the roll</label>
+<input type="file" id="ocrfile" accept="application/pdf,image/*">
+<button class="btn" onclick="runOcr()">Read pages (OCR)</button>
+<div id="ocrprog" class="note" aria-live="polite"></div>
+<label for="ocrq">Search a name or word</label>
+<input type="text" id="ocrq" placeholder="e.g. Ramesh Kumar">
+<button class="btn alt" onclick="searchOcr()">Search</button>
+<div id="ocrres" aria-live="polite"></div>
+</section>
 </div>
 
 <p class="note">Document rules follow ECI's 27 Oct 2025 instructions. Discrepancy rules shown are as reported in court and press, not an official list.</p>
@@ -236,7 +256,7 @@ var cur=0,saved=0,logs=[];
 var WHY={unm:"Your details could not be linked to the last SIR roll (2002 in Delhi). Documents are needed only for this notice.",par:"A parent looks fewer than 15 years older than you in the records. This is a data check, not a finding about you.",nam:"A spelling differs between records. A document showing the correct spelling usually settles it."};
 var DOCS="Government or PSU ID or pension order; certificate issued before 1 July 1987; birth certificate; passport; school or board certificate; permanent residence certificate; forest rights certificate; caste certificate; family register; land or house allotment; Aadhaar (identity only)";
 function $(i){return document.getElementById(i)}
-function tab(n){for(var i=0;i<7;i++){$("p"+i).hidden=i!==n;$("t"+i).setAttribute("aria-selected",i===n)}if(n==1)drawBloStats();if(n==2)drawLog();if(n==4){drawDels();drawDash()}if(n==5)drawGuide();if(n==6)drawFlow()}
+function tab(n){for(var i=0;i<8;i++){$("p"+i).hidden=i!==n;$("t"+i).setAttribute("aria-selected",i===n)}if(n==1)drawBloStats();if(n==2)drawLog();if(n==4){drawDels();drawDash()}if(n==5)drawGuide();if(n==6)drawFlow()}
 var D=[{id:"DEMO-0101",why:"Dead",st:0,n:false},{id:"DEMO-0102",why:"Shifted",st:0,n:false},{id:"DEMO-0103",why:"Duplicate",st:0,n:false},{id:"DEMO-0104",why:"Absent",st:0,n:false}];
 var DST=["Listed","Proposed by ERO","Approved by second officer"];
 function drawDels(){$("dels").innerHTML="<table>"+D.map(function(d,i){var b=d.st==0?'<button class="btn alt" onclick="prop('+i+')">Propose deletion (ERO)</button>':d.st==1?'<button class="btn" onclick="appr('+i+')">Approve (second officer)</button>':"";
@@ -289,6 +309,59 @@ if(!ok){$("err").innerHTML='<div class="err">Fill every field and tick the confi
 m.forEach(function(k){e.f[k]=$("f_"+k).value.trim()});e.asked=false;saved++;if(e.stage<2)e.stage=2;
 log("Elector "+e.id+" submitted "+m.length+" field(s) on their phone. Status moved to Digitised. One return visit avoided.");draw();drawBlo();drawBloStats()}
 opts();draw();drawBloStats();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+<script>
+if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.min.js";
+var OCR_PAGES=[];
+function ocrProg(t){var p=document.getElementById("ocrprog");if(p)p.textContent=t}
+async function runOcr(){
+var f=document.getElementById("ocrfile").files[0];
+if(!f){ocrProg("Choose a file first.");return}
+OCR_PAGES=[];document.getElementById("ocrres").innerHTML="";
+try{
+if(f.type==="application/pdf"){
+var buf=await f.arrayBuffer();
+var pdf=await pdfjsLib.getDocument({data:buf}).promise;
+for(var p=1;p<=pdf.numPages;p++){
+ocrProg("Rendering page "+p+" of "+pdf.numPages+"\u2026");
+var page=await pdf.getPage(p);
+var vp=page.getViewport({scale:2});
+var canvas=document.createElement("canvas");
+canvas.width=vp.width;canvas.height=vp.height;
+await page.render({canvasContext:canvas.getContext("2d"),viewport:vp}).promise;
+ocrProg("Reading text on page "+p+" of "+pdf.numPages+" (OCR)\u2026");
+var res=await Tesseract.recognize(canvas,"eng");
+OCR_PAGES.push({page:p,text:res.data.text});
+}
+}else{
+ocrProg("Reading text (OCR)\u2026");
+var res2=await Tesseract.recognize(f,"eng");
+OCR_PAGES.push({page:1,text:res2.data.text});
+}
+ocrProg("Done. Read "+OCR_PAGES.length+" page(s). You can search now.");
+}catch(e){
+ocrProg("");
+document.getElementById("ocrres").innerHTML='<div class="err">OCR failed to load or run: '+String(e&&e.message||e)+". Check your internet connection and try again.</div>";
+}
+}
+function searchOcr(){
+var q=document.getElementById("ocrq").value.trim().toLowerCase();
+var out=document.getElementById("ocrres");
+if(!q){out.innerHTML='<p class="note">Type something to search.</p>';return}
+if(!OCR_PAGES.length){out.innerHTML='<p class="note">Read a PDF or image first.</p>';return}
+var hits=[];
+OCR_PAGES.forEach(function(pg){
+var low=pg.text.toLowerCase(),idx=low.indexOf(q);
+while(idx!==-1){
+var start=Math.max(0,idx-30),end=Math.min(pg.text.length,idx+q.length+30);
+hits.push({page:pg.page,snippet:pg.text.slice(start,end).replace(/\s+/g," ")});
+idx=low.indexOf(q,idx+q.length);
+}
+});
+out.innerHTML=hits.length?'<p class="ok">'+hits.length+" match(es) found.</p><ul>"+hits.map(function(h){return "<li><b>Page "+h.page+":</b> \u2026"+h.snippet+"\u2026</li>"}).join("")+"</ul>":'<p class="bad">No match found.</p>'
+}
 </script>
 </body>
 </html>
