@@ -129,6 +129,20 @@ td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:top}
 <section>
 <h2>SIR rules in one place</h2>
 <p class="note">From ECI's 27 Oct 2025 instructions, the Delhi CEO FAQ and the Supreme Court judgment of 27 May 2026 (2026 INSC 564).</p>
+<label for="ruleq">Search the rules</label>
+<input type="text" id="ruleq" placeholder="e.g. documents, appeal, camp, schedule" oninput="rulesFilter()">
+<div class="note" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 2px">Quick filters:
+<button class="btn alt" onclick="quickRule('document')">Documents</button>
+<button class="btn alt" onclick="quickRule('appeal')">Appeal</button>
+<button class="btn alt" onclick="quickRule('camp')">Camps and help desks</button>
+<button class="btn alt" onclick="quickRule('schedule')">Schedule</button>
+<button class="btn alt" onclick="quickRule('')">Clear</button>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 14px">
+<button class="btn alt" onclick="rulesExpand(true)">Expand all</button>
+<button class="btn alt" onclick="rulesExpand(false)">Collapse all</button>
+</div>
+<div id="rules">
 <details open><summary><b>Enumeration</b></summary><ul>
 <li>BLO delivers pre-printed forms in duplicate and makes at least 3 visits to collect them.</li>
 <li>The elector's copy gets an acknowledgement. Any adult family member can sign.</li>
@@ -169,6 +183,8 @@ td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:top}
 <details><summary><b>Schedule</b></summary><ul>
 <li>Phase II template: preparation 28 Oct to 3 Nov, enumeration 4 Nov to 4 Dec, draft roll 9 Dec, claims to 8 Jan, notices and decisions to 31 Jan, final roll 7 Feb.</li>
 <li>Delhi: draft roll 5 Aug 2026. ECI's press note of 26 Sep 2026 extended claims and objections to 30 Oct 2026 and disposal of notices and claims to 30 Nov 2026, so earlier FAQ dates are out of date.</li><li>Maharashtra: claims to 12 Oct 2026 and disposal to 10 Nov 2026.</li></ul></details>
+</div>
+<p id="rulesnone" class="err" style="display:none">No rule matches that search. Try a shorter word or clear the search.</p>
 </section>
 </div>
 
@@ -317,6 +333,14 @@ $("guide").innerHTML="<ol class=\"steps\">"+
 "</ol><p class=\"note\">Numbers above are from the demo electors in this prototype, not real data.</p>"}
 function drawBloStats(){var checked=E.filter(function(e){return e.checked}).length,digit=E.filter(function(e){return e.stage>=2}).length,notices=D.filter(function(d){return d.n}).length,pending=E.length-digit;
 $("blostats").innerHTML="<table><tr><td>Doorstep checks done</td><td><b>"+checked+" of "+E.length+"</b></td></tr><tr><td>Forms digitised</td><td><b>"+digit+" of "+E.length+"</b></td></tr><tr><td>Notices with hearing offered</td><td><b>"+notices+" of "+D.length+"</b></td></tr><tr><td>Still pending</td><td><b>"+pending+"</b></td></tr><tr><td>Return visits avoided</td><td><b>"+saved+"</b></td></tr></table>"}
+function rulesFilter(term){var q=(typeof term==="string"?term:$("ruleq").value).trim().toLowerCase();if(typeof term==="string")$("ruleq").value=term;var any=false;
+document.querySelectorAll("#rules details").forEach(function(d){
+var summaryText=d.querySelector("summary").textContent.toLowerCase(),summaryMatches=!q||summaryText.indexOf(q)!==-1,matchCount=0;
+d.querySelectorAll("li").forEach(function(li){var liMatches=li.textContent.toLowerCase().indexOf(q)!==-1,show=!q||summaryMatches||liMatches;li.style.display=show?"":"none";if(show)matchCount++});
+var visible=!q||summaryMatches||matchCount>0;d.style.display=visible?"":"none";if(visible){any=true;if(q)d.open=true}});
+$("rulesnone").style.display=any?"none":""}
+function quickRule(term){rulesFilter(term)}
+function rulesExpand(open){document.querySelectorAll("#rules details").forEach(function(d){d.open=open})}
 function missing(e){return Object.keys(FIELDS).filter(function(k){return !e.f[k]})}
 function log(m){var d=new Date();logs.unshift({t:d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),m:m});drawLog()}
 function drawLog(){$("log").innerHTML=logs.length?logs.map(function(l){return"<li><time>"+l.t+"</time>"+l.m+"</li>"}).join(""):"<li>No activity yet.</li>"}
