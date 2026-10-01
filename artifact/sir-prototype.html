@@ -229,14 +229,45 @@ td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:top}
 <div id="p7" hidden>
 <section>
 <h2>Search a scanned SIR roll PDF</h2>
-<p class="note">Many published SIR rolls are scanned images, so normal PDF text search does not find a name in them. This runs OCR (optical character recognition) in your browser: the file is read on your device and is never uploaded anywhere. The first use needs an internet connection, to load the OCR library. Official ECI tool for comparison: <a href="https://voters.eci.gov.in/searchinsir/s2ua4dpdf-jk4qwodse" target="_blank" rel="noopener">voters.eci.gov.in</a>.</p>
-<label for="ocrfile">Choose a PDF or image of the roll</label>
+<p class="note">Styled after ECI's own "Search in last SIR E-Roll" tool, but it runs OCR (optical character recognition) on your own file in your browser instead of a government database. Many published rolls are scanned images, so ordinary PDF text search does not find a name in them. Nothing is uploaded: the file stays on your device. The first use needs an internet connection, to load the OCR library. Official tool for comparison: <a href="https://voters.eci.gov.in/searchinsir/s2ua4dpdf-jk4qwodse" target="_blank" rel="noopener">voters.eci.gov.in</a>.</p>
+<label for="ocrfile">Step 1: choose a PDF or image of the scanned roll</label>
 <input type="file" id="ocrfile" accept="application/pdf,image/*">
 <button class="btn" onclick="runOcr()">Read pages (OCR)</button>
 <div id="ocrprog" class="note" aria-live="polite"></div>
-<label for="ocrq">Search a name or word</label>
-<input type="text" id="ocrq" placeholder="e.g. Ramesh Kumar">
-<button class="btn alt" onclick="searchOcr()">Search</button>
+</section>
+<section>
+<h2>Step 2: search</h2>
+<div class="tabs" role="tablist">
+<button role="tab" id="st0" aria-selected="true" onclick="ocrTab(0)">Search by EPIC No.</button>
+<button role="tab" id="st1" aria-selected="false" onclick="ocrTab(1)">Search by Elector Details</button>
+</div>
+<div id="sp0">
+<label for="epic">EPIC No. (as printed on the roll) *</label>
+<input type="text" id="epic" placeholder="e.g. ABC1234567">
+<button class="btn alt" onclick="searchEpic()">Search</button>
+</div>
+<div id="sp1" hidden>
+<label for="st">State</label>
+<select id="st"><option value="">Any</option><option>Delhi</option><option>Bihar</option><option>West Bengal</option><option>Maharashtra</option></select>
+<label for="dist">District</label>
+<input type="text" id="dist">
+<label for="ac">Assembly Constituency</label>
+<input type="text" id="ac">
+<label for="ps">Polling Station No. and Name</label>
+<input type="text" id="ps">
+<label for="psn">Part Serial No.</label>
+<input type="text" id="psn">
+<label for="ename">Elector Full Name in last SIR *</label>
+<input type="text" id="ename" placeholder="e.g. Ramesh Kumar">
+<label for="eage">Elector Age (Indicative)</label>
+<input type="text" id="eage">
+<label for="reltype">Relative Type</label>
+<select id="reltype"><option value="">Any</option><option>Father</option><option>Mother</option><option>Husband</option><option>Guardian</option></select>
+<label for="relname">Elector Relative Full Name</label>
+<input type="text" id="relname">
+<button class="btn alt" onclick="searchDetails()">Search</button>
+<p class="note">Search also works in the state's native language: type the name in that script. Spelling may differ between the last SIR roll and current records, so if you find nothing, try variations of the name (for example, Maneesh and Manish).</p>
+</div>
 <div id="ocrres" aria-live="polite"></div>
 </section>
 </div>
@@ -346,21 +377,31 @@ ocrProg("");
 document.getElementById("ocrres").innerHTML='<div class="err">OCR failed to load or run: '+String(e&&e.message||e)+". Check your internet connection and try again.</div>";
 }
 }
-function searchOcr(){
-var q=document.getElementById("ocrq").value.trim().toLowerCase();
-var out=document.getElementById("ocrres");
-if(!q){out.innerHTML='<p class="note">Type something to search.</p>';return}
+function ocrTab(n){$("sp0").hidden=n!==0;$("sp1").hidden=n!==1;$("st0").setAttribute("aria-selected",n===0);$("st1").setAttribute("aria-selected",n===1);$("ocrres").innerHTML=""}
+function searchEpic(){
+var v=$("epic").value.trim();
+if(!v){$("ocrres").innerHTML='<p class="note">Enter an EPIC No. to search.</p>';return}
+runOcrSearch([v])
+}
+function searchDetails(){
+var name=$("ename").value.trim();
+if(!name){$("ocrres").innerHTML='<p class="note">Elector full name is required.</p>';return}
+var terms=[name,$("psn").value.trim(),$("eage").value.trim(),$("relname").value.trim()].filter(function(t){return t});
+runOcrSearch(terms)
+}
+function runOcrSearch(terms){
+var out=$("ocrres");
 if(!OCR_PAGES.length){out.innerHTML='<p class="note">Read a PDF or image first.</p>';return}
+var low=terms.map(function(t){return t.toLowerCase()});
 var hits=[];
 OCR_PAGES.forEach(function(pg){
-var low=pg.text.toLowerCase(),idx=low.indexOf(q);
-while(idx!==-1){
-var start=Math.max(0,idx-30),end=Math.min(pg.text.length,idx+q.length+30);
+var textLow=pg.text.toLowerCase();
+if(!low.every(function(t){return textLow.indexOf(t)!==-1}))return;
+var idx=textLow.indexOf(low[0]);
+var start=Math.max(0,idx-30),end=Math.min(pg.text.length,idx+low[0].length+30);
 hits.push({page:pg.page,snippet:pg.text.slice(start,end).replace(/\s+/g," ")});
-idx=low.indexOf(q,idx+q.length);
-}
 });
-out.innerHTML=hits.length?'<p class="ok">'+hits.length+" match(es) found.</p><ul>"+hits.map(function(h){return "<li><b>Page "+h.page+":</b> \u2026"+h.snippet+"\u2026</li>"}).join("")+"</ul>":'<p class="bad">No match found.</p>'
+out.innerHTML=hits.length?'<p class="ok">'+hits.length+" page(s) match.</p><ul>"+hits.map(function(h){return "<li><b>Page "+h.page+":</b> \u2026"+h.snippet+"\u2026</li>"}).join("")+"</ul>":'<p class="bad">No match found. Try fewer fields or a different spelling.</p>'
 }
 </script>
 </body>
