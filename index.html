@@ -341,10 +341,10 @@ m.forEach(function(k){e.f[k]=$("f_"+k).value.trim()});e.asked=false;saved++;if(e
 log("Elector "+e.id+" submitted "+m.length+" field(s) on their phone. Status moved to Digitised. One return visit avoided.");draw();drawBlo();drawBloStats()}
 opts();draw();drawBloStats();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
 <script>
-if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.min.js";
+if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 var OCR_PAGES=[];
 function ocrProg(t){var p=document.getElementById("ocrprog");if(p)p.textContent=t}
 async function runOcr(){
@@ -352,6 +352,7 @@ var f=document.getElementById("ocrfile").files[0];
 if(!f){ocrProg("Choose a file first.");return}
 OCR_PAGES=[];document.getElementById("ocrres").innerHTML="";
 try{
+if(!window.pdfjsLib||!window.Tesseract)throw new Error("OCR library did not load from the CDN. Check your internet connection and reload the page.");
 if(f.type==="application/pdf"){
 var buf=await f.arrayBuffer();
 var pdf=await pdfjsLib.getDocument({data:buf}).promise;
