@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SIR backend — realtime monitor</title>
+<style>
+body{font:16px/1.5 system-ui,sans-serif;margin:0;background:#10141c;color:#e8ecf4}
+main{max-width:720px;margin:0 auto;padding:24px 16px}
+h1{font-size:1.4rem}
+section{background:#1a2030;border:1px solid #2e3750;border-radius:10px;padding:16px;margin-bottom:14px}
+table{width:100%;border-collapse:collapse}
+td{padding:6px 4px;border-bottom:1px solid #2e3750}
+.log{list-style:none;margin:0;padding:0;font-size:.9rem;max-height:240px;overflow:auto}
+.log li{padding:6px 0;border-bottom:1px solid #2e3750}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.on{background:#5fd09a}.off{background:#ff8a80}
+</style>
+</head>
+<body>
+<main>
+<h1>SIR prototype backend — realtime monitor</h1>
+<p><span class="dot off" id="dot"></span><span id="status">Connecting…</span></p>
+<section>
+<h2>Dashboard (pushed live)</h2>
+<div id="dash">Waiting for data…</div>
+</section>
+<section>
+<h2>Incoming events</h2>
+<ul class="log" id="log"><li>No events yet.</li></ul>
+</section>
+<p style="opacity:.7;font-size:.85rem">This simulates what a real election database integration would push over time: this is NOT connected to ECINet or any official system.</p>
+</main>
+<script>
+var logs=[];
+function drawDash(d){document.getElementById("dash").innerHTML="<table>"+
+"<tr><td>Total electors</td><td><b>"+d.total+"</b></td></tr>"+
+"<tr><td>Forms collected</td><td><b>"+d.formsCollected+"</b></td></tr>"+
+"<tr><td>Digitised</td><td><b>"+d.digitised+"</b></td></tr>"+
+"<tr><td>Notices sent</td><td><b>"+d.noticesSent+"</b></td></tr>"+
+"<tr><td>Return visits avoided</td><td><b>"+d.savedVisits+"</b></td></tr></table>"}
+function addLog(m){logs.unshift(m);logs=logs.slice(0,50);document.getElementById("log").innerHTML=logs.map(function(l){return "<li>"+l+"</li>"}).join("")}
+function connect(){
+var proto=location.protocol==="https:"?"wss:":"ws:";
+var ws=new WebSocket(proto+"//"+location.host+"/ws");
+ws.onopen=function(){document.getElementById("status").textContent="Live";document.getElementById("dot").className="dot on"};
+ws.onclose=function(){document.getElementById("status").textContent="Disconnected, retrying…";document.getElementById("dot").className="dot off";setTimeout(connect,2000)};
+ws.onmessage=function(ev){
+var msg=JSON.parse(ev.data);
+if(msg.type==="snapshot"){drawDash(msg.payload.dashboard);msg.payload.activity.slice(0,10).forEach(function(a){addLog(a.m)})}
+else if(msg.type==="activity"){addLog(msg.payload.m)}
+else if(msg.type==="elector"||msg.type==="deletion"){fetch("/api/dashboard").then(function(r){return r.json()}).then(drawDash)}
+};
+}
+connect();
+</script>
+</body>
+</html>
