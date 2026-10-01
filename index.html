@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SIR status and notice helper (prototype)</title>
+<style>
+:root{--bg:#f3f5f8;--card:#fff;--ink:#14213d;--mut:#5b6577;--line:#d5dae3;--ac:#4b2e9a;--acbg:#ece8f8;--ok:#1b7a4b;--bad:#b3261e;--badbg:#fbeae9;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10141c;--card:#1a2030;--ink:#e8ecf4;--mut:#9aa5b8;--line:#2e3750;--ac:#b9a6ff;--acbg:#2a2450;--ok:#5fd09a;--bad:#ff8a80;--badbg:#3a1f22}}
+:root[data-theme="dark"]{--bg:#10141c;--card:#1a2030;--ink:#e8ecf4;--mut:#9aa5b8;--line:#2e3750;--ac:#b9a6ff;--acbg:#2a2450;--ok:#5fd09a;--bad:#ff8a80;--badbg:#3a1f22}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:20px 16px 48px}
+h1{font:700 1.5rem/1.2 Georgia,"Times New Roman",serif;margin:0 0 4px}
+h2{font:700 1.1rem/1.3 Georgia,serif;margin:0 0 10px}
+.sub{color:var(--mut);margin:0 0 16px;font-size:.9rem}
+.tabs{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto}
+.tabs button{flex:1;min-width:max-content;padding:10px 14px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;font:inherit;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--ac);color:#fff;border-color:var(--ac)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tabs button[aria-selected="true"]{color:#10141c}}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+label{display:block;font-size:.9rem;color:var(--mut);margin:10px 0 4px}
+select,input[type=text]{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.btn{padding:10px 16px;border:0;border-radius:8px;background:var(--ac);color:#fff;font:inherit;cursor:pointer;margin-top:12px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn{color:#10141c}}
+.btn.alt{background:var(--acbg);color:var(--ac)}
+ol.steps{list-style:none;margin:8px 0;padding:0}
+ol.steps li{position:relative;padding:4px 0 10px 32px;color:var(--mut)}
+ol.steps li:before{content:"";position:absolute;left:7px;top:9px;width:12px;height:12px;border-radius:50%;border:2px solid var(--line);background:var(--card)}
+ol.steps li:after{content:"";position:absolute;left:12px;top:24px;width:2px;height:calc(100% - 14px);background:var(--line)}
+ol.steps li:last-child:after{display:none}
+ol.steps li.done{color:var(--ink)}
+ol.steps li.done:before{background:var(--ok);border-color:var(--ok)}
+ol.steps li.now{color:var(--ink);font-weight:700}
+ol.steps li.now:before{background:var(--ac);border-color:var(--ac);box-shadow:0 0 0 4px var(--acbg)}
+.next{background:var(--acbg);border-radius:8px;padding:10px 12px;margin-top:6px}
+.note{font-size:.85rem;color:var(--mut)}
+.res{border-left:4px solid var(--ac);padding:4px 12px;margin-top:12px}
+.res ul{margin:6px 0;padding-left:20px}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+.ok{color:var(--ok);font-weight:700}.bad{color:var(--bad);font-weight:700}
+.phone{max-width:320px;margin:12px auto 0;border:2px solid var(--ink);border-radius:22px;padding:16px;background:var(--bg)}
+.phone h3{margin:0 0 6px;font-size:1rem}
+.err{background:var(--badbg);color:var(--bad);padding:8px 10px;border-radius:8px;margin-top:10px}
+.stat{font:700 1.8rem/1 Georgia,serif;color:var(--ac)}
+.log{list-style:none;margin:0;padding:0;font-size:.9rem}
+.log li{padding:8px 0;border-bottom:1px solid var(--line)}
+.log time{color:var(--mut);margin-right:8px}
+.chk{display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:.9rem}
+.chk input{margin-top:4px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+<h1>SIR status and notice helper</h1>
+<p class="sub">Prototype with made-up people and data. Not connected to any ECI system.</p>
+
+<div class="tabs" role="tablist">
+<button role="tab" id="t0" aria-selected="true" onclick="tab(0)">For electors</button>
+<button role="tab" id="t1" aria-selected="false" onclick="tab(1)">For BLOs</button>
+<button role="tab" id="t2" aria-selected="false" onclick="tab(2)">Activity log</button>
+<button role="tab" id="t3" aria-selected="false" onclick="tab(3)">All rules</button>
+<button role="tab" id="t4" aria-selected="false" onclick="tab(4)">Officers and public view</button>
+<button role="tab" id="t5" aria-selected="false" onclick="tab(5)">Simple guide</button>
+<button role="tab" id="t6" aria-selected="false" onclick="tab(6)">Workflow</button>
+<button role="tab" id="t7" aria-selected="false" onclick="tab(7)">Search in SIR (OCR)</button>
+</div>
+
+<div id="p0">
+<section>
+<h2>Where is my form?</h2>
+<label for="sel0">Choose a demo elector</label>
+<select id="sel0" onchange="pick(this.value)"></select>
+<ol class="steps" id="steps"></ol>
+<div class="next" id="next"></div>
+</section>
+<section>
+<h2>Got a notice? Find out what to do</h2>
+<label for="why">Reason on the notice</label>
+<select id="why">
+<option value="unm">Not linked to the last SIR roll</option>
+<option value="par">Parent's age gap looks wrong</option>
+<option value="nam">Name spelling differs between records</option>
+</select>
+<label for="born">When were you born?</label>
+<select id="born">
+<option value="a">Before 1 July 1987</option>
+<option value="b">1 July 1987 to 2 December 2004</option>
+<option value="c">After 2 December 2004</option>
+</select>
+<button class="btn" onclick="decode()">Show what I need</button>
+<div id="dec" aria-live="polite"></div>
+</section>
+</div>
+
+<div id="p1" hidden>
+<section>
+<h2>Live check at the doorstep</h2>
+<p class="note">Instead of taking the form away and returning later, check what is missing now and ask the elector to complete it on their own phone. For notices, the BLO can also collect documents at the doorstep and upload them for the ERO.</p>
+<label for="sel1">Choose a demo elector</label>
+<select id="sel1" onchange="pick(this.value)"></select>
+<button class="btn" onclick="check()">Check live status</button>
+<div id="blo" aria-live="polite"></div>
+</section>
+<section>
+<div class="stat" id="saved">0</div>
+<div class="note">return visits avoided in this session</div>
+</section>
+<section>
+<h2>This BLO's work so far</h2>
+<p class="note">Shown to the BLO and, in aggregate, to the public. Transparency means a BLO's own numbers are always visible, not just the final roll.</p>
+<div id="blostats"></div>
+</section>
+</div>
+
+<div id="p2" hidden>
+<section>
+<h2>Activity log</h2>
+<p class="note">Every change records who did it, what changed and when. In a real system this log would be append-only.</p>
+<ul class="log" id="log"><li>No activity yet.</li></ul>
+</section>
+</div>
+
+<div id="p3" hidden>
+<section>
+<h2>SIR rules in one place</h2>
+<p class="note">From ECI's 27 Oct 2025 instructions, the Delhi CEO FAQ and the Supreme Court judgment of 27 May 2026 (2026 INSC 564).</p>
+<details open><summary><b>Enumeration</b></summary><ul>
+<li>BLO delivers pre-printed forms in duplicate and makes at least 3 visits to collect them.</li>
+<li>The elector's copy gets an acknowledgement. Any adult family member can sign.</li>
+<li>No document is collected at this stage.</li>
+<li>BLO carries at least 30 blank Form 6 and declaration forms for new electors.</li>
+<li>Online option: voters.eci.gov.in with OTP login and OTP e-sign. It works only if the roll name matches the Aadhaar name.</li>
+<li>Electors give their own or a relative's entry from the last SIR roll (2002 in Delhi).</li></ul></details>
+<details><summary><b>Forms not returned</b></summary><ul>
+<li>BLO notes a probable reason after asking neighbours: absent, shifted, dead or duplicate.</li>
+<li>Booth-wise lists with reasons go on notice boards at the Panchayat or urban body office and the Block Development Officer's office.</li>
+<li>CEOs put the lists on their website. Parties' booth-level agents get them before the draft roll.</li></ul></details>
+<details><summary><b>Draft roll and claims</b></summary><ul>
+<li>Draft roll comes with a Form 5 notice, which also invites advance applications for 1 April, 1 July and 1 October 2026 qualifying dates.</li>
+<li>About a month for claims and objections. Anyone missing from the draft roll files Form 6 with a declaration form.</li></ul></details>
+<details><summary><b>Notices and documents</b></summary><ul>
+<li>The ERO issues a notice only after the draft roll, and only to electors who could not be linked to the last SIR roll.</li>
+<li>Born before 1 July 1987: a document for yourself.</li>
+<li>Born 1 July 1987 to 2 December 2004: a document for yourself and one for a parent.</li>
+<li>Born after 2 December 2004: documents for yourself, your father and your mother. If a parent is not Indian, their passport and visa from the time of your birth.</li>
+<li>Born abroad: birth registration from the Indian Mission. Citizenship by registration or naturalisation: the certificate.</li>
+<li>Aadhaar counts as identity proof only, not citizenship, and officers may verify it.</li></ul>
+<p><b>Indicative list (any one per person):</b></p><ol>
+<li>Government or PSU employee ID or pension order</li>
+<li>Government, local body, bank, Post Office, LIC or PSU document issued before 1 July 1987</li>
+<li>Birth certificate</li><li>Passport</li><li>Matriculation or educational certificate</li>
+<li>Permanent residence certificate</li><li>Forest Right Certificate</li><li>OBC, SC, ST or other caste certificate</li>
+<li>National Register of Citizens, where it exists</li><li>Family register</li><li>Government land or house allotment certificate</li>
+<li>Aadhaar, under ECI's 9 Sep 2025 letter</li><li>Extract of the Bihar SIR roll (1 July 2025)</li></ol></details>
+<details><summary><b>Hearing, decision and appeal</b></summary><ul>
+<li>No deletion without an ERO enquiry and a fair chance to respond.</li>
+<li>The ERO gives a reasoned, speaking order.</li>
+<li>First appeal to the District Magistrate, second appeal to the Chief Electoral Officer within 30 days. The Delhi FAQ gives 15 days for the first appeal.</li>
+<li>Staff must not harass the old, sick, poor or disabled.</li></ul></details>
+<details open><summary><b>Documents at home, hearings and camps (ECI press note, 26 Sep 2026)</b></summary><ul><li>For a notice about being unmapped or having a logical discrepancy, the BLO visits the home, collects the documents and uploads them on ECINet for the ERO to decide.</li><li>The elector need not attend the ERO office. Only in exceptional cases the ERO holds a hearing, preferably online.</li><li>Any adult family member can be authorised to attend a hearing on the elector's behalf.</li><li>DEOs set up help desks and special camps for night shelters, labour, poor and homeless people.</li><li>The Form 6 declaration used in SIR has been upheld by the Supreme Court. Outside SIR, the forms in the 1960 Rules apply.</li><li>Anyone left out, including first-time voters, can apply to the ERO under continuous updation.</li><li>A committee headed by a Senior Deputy Election Commissioner with an independent IIT or IIIT expert will review ECINet for compliance with the Acts and Rules.</li><li>Names under the unmapped and logical discrepancy categories must be displayed publicly (ECI directions for West Bengal, Jan 2026).</li><li>If an application is rejected, the specific reason must be stated.</li></ul></details>
+<details><summary><b>Support and staffing</b></summary><ul>
+<li>Party booth-level agents and legal-aid para-legal volunteers help electors file claims.</li>
+<li>No DEO, ERO or AERO post may stay vacant, and no SIR official is transferred without ECI approval.</li></ul></details>
+<details><summary><b>Schedule</b></summary><ul>
+<li>Phase II template: preparation 28 Oct to 3 Nov, enumeration 4 Nov to 4 Dec, draft roll 9 Dec, claims to 8 Jan, notices and decisions to 31 Jan, final roll 7 Feb.</li>
+<li>Delhi: draft roll 5 Aug 2026. ECI's press note of 26 Sep 2026 extended claims and objections to 30 Oct 2026 and disposal of notices and claims to 30 Nov 2026, so earlier FAQ dates are out of date.</li><li>Maharashtra: claims to 12 Oct 2026 and disposal to 10 Nov 2026.</li></ul></details>
+</section>
+</div>
+
+<div id="p4" hidden>
+<section>
+<h2>Deletions need a second officer</h2>
+<p class="note">Rule: no deletion without a notice and a chance to be heard. The ERO proposes, and a different officer approves.</p>
+<div id="dels"></div>
+</section>
+<section>
+<h2>Public dashboard</h2>
+<p class="note">Aggregates only. Individual records stay behind login.</p>
+<div id="dash"></div>
+</section>
+</div>
+
+<div id="p5" hidden>
+<section>
+<h2>What is happening to my name on the roll?</h2>
+<p class="note">No legal terms. Just what has happened and what happens next.</p>
+<div id="guide"></div>
+</section>
+<section>
+<h2>Already built in this prototype</h2>
+<ul>
+<li>Status tracker for each elector, step by step.</li>
+<li>Notice decoder: tell it your birth year and the reason, it lists the documents.</li>
+<li>Doorstep check so a BLO does not need a second visit for small gaps.</li>
+<li>An append-only activity log of every action.</li>
+<li>A two-person check before any name is deleted, with a notice and hearing recorded first.</li>
+<li>A public dashboard of aggregate counts, not individual records.</li>
+</ul>
+<h2>Not built yet (planned)</h2>
+<ul>
+<li>SMS or WhatsApp updates to the elector at each stage.</li>
+<li>Push notifications to the BLO's phone for pending visits.</li>
+<li>Real login, real ECINet connection, real documents.</li>
+</ul>
+</section>
+</div>
+
+<div id="p6" hidden>
+<section>
+<h2>The automated pipeline</h2>
+<p class="note">What a computer does on its own, and where a person must still decide. This is the backbone for transparency: every automatic step should log what it did and why.</p>
+<ol class="steps" id="flow"></ol>
+</section>
+<section>
+<h2>Hosting and deployment</h2>
+<p class="note">This page is static: no server, no database. A commit to the repository's main branch can auto-deploy it, so the public always sees the latest version. See <code>.github/workflows/deploy-pages.yml</code> for a ready-made GitHub Pages workflow.</p>
+</section>
+<section>
+<h2>A backend for realtime updates</h2>
+<p class="note">The <code>backend/</code> folder has a small Node server that simulates what integrating a real election database would look like: a REST API plus a WebSocket feed that pushes elector, deletion and activity updates live, instead of this page's in-memory demo data. Run <code>npm start</code> inside <code>backend/</code> and open its monitor page to see it.</p>
+</section>
+</div>
+
+<div id="p7" hidden>
+<section>
+<h2>Search a scanned SIR roll PDF</h2>
+<p class="note">Many published SIR rolls are scanned images, so normal PDF text search does not find a name in them. This runs OCR (optical character recognition) in your browser: the file is read on your device and is never uploaded anywhere. The first use needs an internet connection, to load the OCR library. Official ECI tool for comparison: <a href="https://voters.eci.gov.in/searchinsir/s2ua4dpdf-jk4qwodse" target="_blank" rel="noopener">voters.eci.gov.in</a>.</p>
+<label for="ocrfile">Choose a PDF or image of the roll</label>
+<input type="file" id="ocrfile" accept="application/pdf,image/*">
+<button class="btn" onclick="runOcr()">Read pages (OCR)</button>
+<div id="ocrprog" class="note" aria-live="polite"></div>
+<label for="ocrq">Search a name or word</label>
+<input type="text" id="ocrq" placeholder="e.g. Ramesh Kumar">
+<button class="btn alt" onclick="searchOcr()">Search</button>
+<div id="ocrres" aria-live="polite"></div>
+</section>
+</div>
+
+<p class="note">Document rules follow ECI's 27 Oct 2025 instructions. Discrepancy rules shown are as reported in court and press, not an official list.</p>
+</main>
+<script>
+var STAGES=["Form issued","Form collected","Digitised","Draft roll","Notice sent","Hearing","Decision recorded"];
+var NEXT=["The BLO delivers your form and collects it on a later visit. You can also fill it online.","The BLO digitises your form in the app.","Your name is checked against the draft roll once it is published.","Check that your name is in the draft roll. If it is missing, file Form 6 with a declaration form.","Reply to the notice with the documents listed below.","Attend your hearing slot or reply by the channel the notice allows.","The decision comes with reasons. You can appeal to the District Election Officer."];
+var FIELDS={dob:"Date of birth",mobile:"Mobile number",father:"Father's or guardian's name",last:"Last SIR roll entry (part and serial no.)"};
+var E=[
+{id:"DEMO-0001",name:"Demo Elector A",stage:1,f:{dob:"12/03/1985",mobile:"",father:"Demo Father A",last:""}},
+{id:"DEMO-0002",name:"Demo Elector B",stage:4,f:{dob:"05/09/1999",mobile:"98000 00002",father:"Demo Father B",last:"Part 14, Sr 220"}},
+{id:"DEMO-0003",name:"Demo Elector C",stage:0,f:{dob:"",mobile:"98000 00003",father:"Demo Father C",last:"Part 9, Sr 41"}}
+];
+var cur=0,saved=0,logs=[];
+var WHY={unm:"Your details could not be linked to the last SIR roll (2002 in Delhi). Documents are needed only for this notice.",par:"A parent looks fewer than 15 years older than you in the records. This is a data check, not a finding about you.",nam:"A spelling differs between records. A document showing the correct spelling usually settles it."};
+var DOCS="Government or PSU ID or pension order; certificate issued before 1 July 1987; birth certificate; passport; school or board certificate; permanent residence certificate; forest rights certificate; caste certificate; family register; land or house allotment; Aadhaar (identity only)";
+function $(i){return document.getElementById(i)}
+function tab(n){for(var i=0;i<8;i++){$("p"+i).hidden=i!==n;$("t"+i).setAttribute("aria-selected",i===n)}if(n==1)drawBloStats();if(n==2)drawLog();if(n==4){drawDels();drawDash()}if(n==5)drawGuide();if(n==6)drawFlow()}
+var D=[{id:"DEMO-0101",why:"Dead",st:0,n:false},{id:"DEMO-0102",why:"Shifted",st:0,n:false},{id:"DEMO-0103",why:"Duplicate",st:0,n:false},{id:"DEMO-0104",why:"Absent",st:0,n:false}];
+var DST=["Listed","Proposed by ERO","Approved by second officer"];
+function drawDels(){$("dels").innerHTML="<table>"+D.map(function(d,i){var b=d.st==0?'<button class="btn alt" onclick="prop('+i+')">Propose deletion (ERO)</button>':d.st==1?'<button class="btn" onclick="appr('+i+')">Approve (second officer)</button>':"";
+return"<tr><td><b>"+d.id+"</b><br>"+d.why+"<br><span class=\"note\">"+DST[d.st]+"</span></td><td>"+(d.st<2?'<label style="display:flex;gap:6px;margin:0"><input type="checkbox" '+(d.n?"checked":"")+' onchange="D['+i+'].n=this.checked"> Notice issued and hearing offered</label>':"")+b+(d.err?'<div class="err">'+d.err+"</div>":"")+"</td></tr>"}).join("")+"</table>"}
+function prop(i){var d=D[i];if(!d.n){d.err="Issue a notice and offer a hearing before proposing a deletion.";drawDels();return}d.err="";d.st=1;log("ERO proposed deletion of "+d.id+" (reason: "+d.why+"). Notice and hearing recorded.");drawDels();drawDash()}
+function appr(i){var d=D[i];d.st=2;d.err="";log("Second officer approved deletion of "+d.id+". Reason code: "+d.why+".");drawDels();drawDash()}
+function drawDash(){var c=function(f){return E.filter(f).length},r=["Absent","Shifted","Dead","Duplicate"];
+$("dash").innerHTML="<table><tr><td>Forms collected</td><td><b>"+c(function(e){return e.stage>=1})+" of "+E.length+"</b></td></tr><tr><td>Digitised</td><td><b>"+c(function(e){return e.stage>=2})+"</b></td></tr><tr><td>Notices sent</td><td><b>"+c(function(e){return e.stage>=4})+"</b></td></tr><tr><td>Return visits avoided</td><td><b>"+saved+"</b></td></tr>"+r.map(function(x){var l=D.filter(function(d){return d.why==x});return"<tr><td>"+x+" (listed, approved)</td><td><b>"+l.length+", "+l.filter(function(d){return d.st==2}).length+"</b></td></tr>"}).join("")+"</table>"}
+var FLOW=[
+{s:"BLO visits home and leaves the form",a:0},
+{s:"BLO collects the filled form",a:0},
+{s:"Form digitised into the roll database",a:1},
+{s:"Draft roll compiled and published",a:1},
+{s:"Unmatched records flagged and notices drafted",a:1},
+{s:"BLO visits home again, collects documents",a:0},
+{s:"Documents uploaded to ECINet",a:1},
+{s:"ERO reviews and decides, with reasons",a:0},
+{s:"Decision and public lists published",a:1},
+{s:"Appeal window opens automatically",a:1}];
+function drawFlow(){$("flow").innerHTML=FLOW.map(function(f){return'<li class="done">'+f.s+' <span class="note">('+(f.a?"automated":"needs a person")+")</span></li>"}).join("")}
+function drawGuide(){var done=E.filter(function(e){return e.stage>=1}).length,draft=E.filter(function(e){return e.stage>=3}).length,notice=E.filter(function(e){return e.stage>=4}).length,dec=E.filter(function(e){return e.stage>=6}).length;
+$("guide").innerHTML="<ol class=\"steps\">"+
+"<li class=\"done\">A BLO brought a form to your home. "+done+" of "+E.length+" demo electors have reached this step.</li>"+
+"<li class=\""+(draft?"done":"")+"\">Your name is checked against the draft roll. "+draft+" of "+E.length+" are on a draft roll so far.</li>"+
+"<li class=\""+(notice?"done":"")+"\">If something does not match, you get a notice asking for one simple document. "+notice+" of "+E.length+" have a notice.</li>"+
+"<li class=\""+(dec?"done":"")+"\">A decision is recorded with reasons, and you can appeal it. "+dec+" of "+E.length+" have a decision.</li>"+
+"</ol><p class=\"note\">Numbers above are from the demo electors in this prototype, not real data.</p>"}
+function drawBloStats(){var checked=E.filter(function(e){return e.checked}).length,digit=E.filter(function(e){return e.stage>=2}).length,notices=D.filter(function(d){return d.n}).length,pending=E.length-digit;
+$("blostats").innerHTML="<table><tr><td>Doorstep checks done</td><td><b>"+checked+" of "+E.length+"</b></td></tr><tr><td>Forms digitised</td><td><b>"+digit+" of "+E.length+"</b></td></tr><tr><td>Notices with hearing offered</td><td><b>"+notices+" of "+D.length+"</b></td></tr><tr><td>Still pending</td><td><b>"+pending+"</b></td></tr><tr><td>Return visits avoided</td><td><b>"+saved+"</b></td></tr></table>"}
+function missing(e){return Object.keys(FIELDS).filter(function(k){return !e.f[k]})}
+function log(m){var d=new Date();logs.unshift({t:d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),m:m});drawLog()}
+function drawLog(){$("log").innerHTML=logs.length?logs.map(function(l){return"<li><time>"+l.t+"</time>"+l.m+"</li>"}).join(""):"<li>No activity yet.</li>"}
+function opts(){var h=E.map(function(e,i){return'<option value="'+i+'">'+e.name+" ("+e.id+")</option>"}).join("");$("sel0").innerHTML=h;$("sel1").innerHTML=h}
+function pick(v){cur=+v;$("sel0").value=v;$("sel1").value=v;draw();$("blo").innerHTML=""}
+function draw(){var e=E[cur];$("steps").innerHTML=STAGES.map(function(s,i){return'<li class="'+(i<e.stage?"done":i==e.stage?"now":"")+'">'+s+"</li>"}).join("");
+var m=missing(e);$("next").innerHTML="<b>Next:</b> "+NEXT[e.stage]+(m.length&&e.stage<3?"<br><b>Missing on your form:</b> "+m.map(function(k){return FIELDS[k]}).join(", "):"");$("saved").textContent=saved}
+function decode(){var b=$("born").value,w=$("why").value;
+var who=b=="a"?["a document for yourself"]:b=="b"?["a document for yourself","a document for one parent"]:["a document for yourself","a document for your father","a document for your mother","if a parent is not Indian, their passport and visa from the time of your birth"];
+$("dec").innerHTML='<div class="res"><p><b>What this means:</b> '+WHY[w]+"</p><p><b>How to submit:</b> your BLO should visit your home, collect the documents and upload them. You do not need to go to the ERO office, and a family member can attend a hearing for you.</p><p><b>What to provide:</b></p><ul>"+who.map(function(x){return"<li>"+x+"</li>"}).join("")+"</ul><p class=\"note\">Any one from this list can work for each person: "+DOCS+".</p></div>"}
+function check(){var e=E[cur],m=missing(e);e.checked=true;log("BLO checked live status of "+e.id+": "+(m.length?m.length+" field(s) missing":"nothing missing"));drawBlo();drawBloStats()}
+function drawBlo(){var e=E[cur],m=missing(e),h="<table>"+Object.keys(FIELDS).map(function(k){return"<tr><td>"+FIELDS[k]+"</td><td>"+(e.f[k]?'<span class="ok">On file</span>':'<span class="bad">Missing</span>')+"</td></tr>"}).join("")+"</table>";
+if(!e.checked){$("blo").innerHTML="";return}
+if(!m.length){h+='<p class="ok">Complete. Ready to digitise'+(e.stage<2?"":" (already done)")+".</p>"}
+else if(!e.asked){h+='<button class="btn" onclick="ask()">Ask elector to fill in now</button><p class="note">Sends a secure link to the elector\'s phone. In a real system the elector verifies with an OTP.</p>'}
+else{h+='<p class="note">Request sent. Elector\'s phone:</p><div class="phone"><h3>Complete your SIR form</h3>'+m.map(function(k){return'<label for="f_'+k+'">'+FIELDS[k]+'</label><input type="text" id="f_'+k+'">'}).join("")+'<div class="chk"><input type="checkbox" id="cf"><label for="cf" style="margin:0">These details are mine and correct.</label></div><button class="btn" onclick="send()">Send details</button><div id="err"></div></div>'}
+$("blo").innerHTML=h}
+function ask(){var e=E[cur];e.asked=true;log("Request sent to elector "+e.id+" for: "+missing(e).map(function(k){return FIELDS[k]}).join(", "));drawBlo()}
+function send(){var e=E[cur],m=missing(e),ok=$("cf").checked;m.forEach(function(k){if(!$("f_"+k).value.trim())ok=false});
+if(!ok){$("err").innerHTML='<div class="err">Fill every field and tick the confirmation box.</div>';return}
+m.forEach(function(k){e.f[k]=$("f_"+k).value.trim()});e.asked=false;saved++;if(e.stage<2)e.stage=2;
+log("Elector "+e.id+" submitted "+m.length+" field(s) on their phone. Status moved to Digitised. One return visit avoided.");draw();drawBlo();drawBloStats()}
+opts();draw();drawBloStats();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+<script>
+if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.min.js";
+var OCR_PAGES=[];
+function ocrProg(t){var p=document.getElementById("ocrprog");if(p)p.textContent=t}
+async function runOcr(){
+var f=document.getElementById("ocrfile").files[0];
+if(!f){ocrProg("Choose a file first.");return}
+OCR_PAGES=[];document.getElementById("ocrres").innerHTML="";
+try{
+if(f.type==="application/pdf"){
+var buf=await f.arrayBuffer();
+var pdf=await pdfjsLib.getDocument({data:buf}).promise;
+for(var p=1;p<=pdf.numPages;p++){
+ocrProg("Rendering page "+p+" of "+pdf.numPages+"\u2026");
+var page=await pdf.getPage(p);
+var vp=page.getViewport({scale:2});
+var canvas=document.createElement("canvas");
+canvas.width=vp.width;canvas.height=vp.height;
+await page.render({canvasContext:canvas.getContext("2d"),viewport:vp}).promise;
+ocrProg("Reading text on page "+p+" of "+pdf.numPages+" (OCR)\u2026");
+var res=await Tesseract.recognize(canvas,"eng");
+OCR_PAGES.push({page:p,text:res.data.text});
+}
+}else{
+ocrProg("Reading text (OCR)\u2026");
+var res2=await Tesseract.recognize(f,"eng");
+OCR_PAGES.push({page:1,text:res2.data.text});
+}
+ocrProg("Done. Read "+OCR_PAGES.length+" page(s). You can search now.");
+}catch(e){
+ocrProg("");
+document.getElementById("ocrres").innerHTML='<div class="err">OCR failed to load or run: '+String(e&&e.message||e)+". Check your internet connection and try again.</div>";
+}
+}
+function searchOcr(){
+var q=document.getElementById("ocrq").value.trim().toLowerCase();
+var out=document.getElementById("ocrres");
+if(!q){out.innerHTML='<p class="note">Type something to search.</p>';return}
+if(!OCR_PAGES.length){out.innerHTML='<p class="note">Read a PDF or image first.</p>';return}
+var hits=[];
+OCR_PAGES.forEach(function(pg){
+var low=pg.text.toLowerCase(),idx=low.indexOf(q);
+while(idx!==-1){
+var start=Math.max(0,idx-30),end=Math.min(pg.text.length,idx+q.length+30);
+hits.push({page:pg.page,snippet:pg.text.slice(start,end).replace(/\s+/g," ")});
+idx=low.indexOf(q,idx+q.length);
+}
+});
+out.innerHTML=hits.length?'<p class="ok">'+hits.length+" match(es) found.</p><ul>"+hits.map(function(h){return "<li><b>Page "+h.page+":</b> \u2026"+h.snippet+"\u2026</li>"}).join("")+"</ul>":'<p class="bad">No match found.</p>'
+}
+</script>
+</body>
+</html>
